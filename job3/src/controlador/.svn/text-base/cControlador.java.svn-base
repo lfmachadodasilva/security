@@ -1,0 +1,294 @@
+/*
+ * PUC-Rio - Pontificia Universidade Catolica
+ * Bacharelado em Sistemas de Informacao
+ *
+ * INF 1416 - Seguranca da Informacao 2010.1     Turma: 3WA
+ * Trabalho P1
+ * Professor: Anderson Oliveira da Silva
+ *
+ * Grupo: Henrique Taunay
+ *        Luiz Felipe Machado
+ */
+package controlador;
+
+import banco.ConnectionManager;
+import gui.cTelaFonemas;
+import gui.cTelaLogin;
+import gui.cTelaPrincipal;
+import gui.cTelaSenhaCartao;
+import gui.cTelaSenhaPessoal;
+import java.util.Vector;
+import main.cUsuario;
+import main.eGrupo;
+
+/**
+ *
+ * @author luizfelipe
+ */
+public class cControlador {
+
+  private cTelaLogin telaLogin = null;
+  private cTelaFonemas telaFonemas = null;
+  private cTelaSenhaPessoal telaSenhaPessoal = null;
+  private cTelaSenhaCartao telaSenhaCartao = null;
+  private cTelaPrincipal telaPrincipal = null;
+  private ConnectionManager banco = null;
+  private cUsuario usuarioCorrente = null;
+
+  /*
+   * Construtor
+   */
+  public cControlador() {
+    banco = new ConnectionManager();
+  }
+
+  public boolean salvaRegistro(int codigo, String usuario) {
+
+    return banco.salvaRegistro(codigo, usuario);
+  }
+
+  public cUsuario getUsuarioCorrente() {
+    return usuarioCorrente;
+  }
+
+  /*
+   * Cria a tela de login
+   * o boolean mostra define se vai mostar (show) na tela ou nao
+   */
+  public void mostraTelaLogin(boolean mostra) {
+
+    int i = banco.quantidadeDeUsuariosNoSistema();
+    if(telaLogin == null) {
+      telaLogin = new cTelaLogin(this);
+    }
+
+    if(mostra) {
+      salvaRegistro(2001, "");
+    }
+
+    telaLogin.setVisible(mostra);
+  }
+
+  /*
+   * Cria a tela de senha
+   * o boolean mostra define se vai mostar (show) na tela ou nao
+   */
+  public void mostraTelaSenhaPessoal(boolean mostra) {
+    if(telaSenhaPessoal == null) {
+      telaSenhaPessoal = new cTelaSenhaPessoal(this);
+    }
+
+    if(mostra) {
+      cTelaSenhaPessoal.numTentativas = 0;
+      salvaRegistro(3001, "");
+      telaSenhaPessoal.sorteiaFonemaBotao();
+    }
+
+    telaSenhaPessoal.setVisible(mostra);
+  }
+
+  /*
+   * Cria a tela principal
+   * o boolean mostra define se vai mostar (show) na tela ou nao
+   */
+  public void mostraTelaPrincipal(boolean mostra) {
+    if(telaPrincipal == null) {
+      telaPrincipal = new cTelaPrincipal(this);
+    }
+
+    if(mostra) {
+      salvaRegistro(5001, usuarioCorrente.getLogin());
+      telaPrincipal.preencheCabecalho(usuarioCorrente.getNome(),
+                                      usuarioCorrente.getLogin(),
+                                      usuarioCorrente.getGrupo().name());
+      telaPrincipal.preencheTotalSUV(String.valueOf(this.retornaSenhasLivres().size()));
+      telaPrincipal.preencheTotalUsuarios(String.valueOf(banco.quantidadeDeUsuariosNoSistema()));
+
+      //telaPrincipal.preencheAltera(usuarioCorrente.getCartaoSenhas().)
+
+      telaPrincipal.mostraTelaPrincipal();
+    }
+
+    telaPrincipal.setVisible(mostra);
+  }
+
+  public int buscaQuantiadeUsuarios() {
+    return banco.quantidadeDeUsuariosNoSistema();
+  }
+
+  /*
+   * Funcao que verifica se a senha que o usuario digitou tem 4 caracteres
+   *(letras maiúsculas de A a Z e números de 0 a 9).
+   */
+  public boolean verificaCaracteresSenhaCartao(String senhaDigitada) {
+    return usuarioCorrente.getCartaoSenhas().verificaCaracteresDaSenha(senhaDigitada);
+  }
+
+  public boolean verificaSenhaCartao(String senhaDigitada, int indexSenhaPedida) {
+    return usuarioCorrente.getCartaoSenhas().verificaSenha(usuarioCorrente.getLogin(),
+                                                           usuarioCorrente.getUid(),
+                                                           senhaDigitada,
+                                                           indexSenhaPedida);
+  }
+
+  public void marcaSenhaUtilizada(int numSenha) {
+    banco.marcaSenhaUtilizada(usuarioCorrente.getUid(), numSenha);
+  }
+
+  public Vector retornaSenhasLivres() {
+    return banco.retornaSenhasLivres(usuarioCorrente.getUid());
+  }
+
+  public void criaCartaoSenhas(cUsuario user, int quantidadeSenhas) {
+    user.getCartaoSenhas().criaCartaoSenhas(user.getLogin(),
+                                            user.getUid(),
+                                            quantidadeSenhas,
+                                            user.getLogin());
+    banco.salvaSUV(user);
+    telaPrincipal.preencheTotalSUV(String.valueOf(user.getCartaoSenhas().getQuantidadeSenhas()));
+  }
+
+  /*
+   * Cria a tela de senha de cartao
+   * o boolean mostra define se vai mostar (show) na tela ou nao
+   */
+  public void mostraTelaSenhaCartao(boolean mostra) {
+    if(telaSenhaCartao == null) {
+      telaSenhaCartao = new cTelaSenhaCartao(this);
+    }
+
+    if(mostra) {
+      salvaRegistro(4001, "");
+      cTelaSenhaCartao.numTentativas = 0;
+      usuarioCorrente.setCartaoSenhas(banco.buscaCartaoSenhas(usuarioCorrente.getUid()));
+      telaSenhaCartao.sorteiaSUV(usuarioCorrente.getCartaoSenhas());
+    }
+
+    telaSenhaCartao.setVisible(mostra);
+  }
+
+  public boolean existeUsuario(String login) {
+    if(banco.buscaUsuario(login) == null) // busca usuario
+    {
+      return false;
+    }
+
+    return true; // login existe
+  }
+
+  /*
+   * Essa funcao busca no banco o usuario com o login login
+   * Caso ache o login, define aquele usuario como corrente
+   * Caso ache o login, preeche os outros campos da classe cUsuario com as imformacoes do banco
+   */
+  public boolean carregaUsuario(String login) {
+    if(usuarioCorrente == null) {
+      usuarioCorrente = banco.buscaUsuario(login); // busca usuario
+    }
+
+    if(usuarioCorrente == null) {
+      return false;// login nao existe
+    }
+    eGrupo g = banco.buscarGrupo(usuarioCorrente.getUid()) == 1 ? eGrupo.Administrador : eGrupo.Usuario;
+    usuarioCorrente.setGrupo(g);
+
+//    usuarioCorrente.setSenhaTextoPlano("BABACA");
+//    banco.alteraSenhaHex(usuarioCorrente.getUid(), usuarioCorrente.getSenhaHex());
+//    usuarioCorrente.getCartaoSenhas().criaCartaoSenhas(usuarioCorrente.getLogin(),
+//                                                       usuarioCorrente.getUid(),
+//                                                       10,
+//                                                       usuarioCorrente.getLogin());
+//    banco.salvaSUV(usuarioCorrente);
+
+    return true; // login existe
+  }
+
+  /*
+   * Funcao que verifica se o usuario corrente esta bloqueado
+   */
+  public boolean verificaUsuarioBloqueado() {
+    return usuarioCorrente.estaBloqueado();
+  }
+
+  /*
+   * Funcao que desconecta o banco
+   */
+  public void desconectaBanco() {
+
+    salvaRegistro(1002, "");
+    banco.desconectar();
+  }
+
+  /*
+   * Funcao que desconecta o banco
+   */
+  public void conectaBanco() {
+    banco.conectar();
+    salvaRegistro(1001, "");
+  }
+
+  /*
+   * Funcao que verifica se a senha bate com a do usuario
+   */
+  public boolean verificaSenhaPessoal(Vector<String> lst_fonemas_selecionados) {
+
+    if(usuarioCorrente == null) {
+      return false;
+    }
+
+    return usuarioCorrente.getSenha().verificaSenha(usuarioCorrente.getLogin(),
+                                                    usuarioCorrente.getUid(),
+                                                    lst_fonemas_selecionados);
+  }
+
+  /*
+   * Bloqueia usuario
+   */
+  public void bloqueiaUsuario() {
+
+    usuarioCorrente.bloqueiaUsuario();
+    banco.bloquearUsuario(usuarioCorrente);
+
+    deslogaUsuario();
+  }
+
+  public void cadastraUsuario(String nome, String login, String grupo, String senha, Integer quantidadeSUV) {
+
+    cUsuario u = new cUsuario();
+    u.setNome(nome);
+    u.setLogin(login);
+    if(grupo.equals(eGrupo.Usuario.name())) {
+      u.setGrupo(eGrupo.Usuario);
+    } else {
+      u.setGrupo(eGrupo.Administrador);
+    }
+
+    // TODO cadastrar na tabelaSUV, ja ja UPDATE, fazer um insert
+    if(banco.cadastraUsuario(u, senha)) {
+      criaCartaoSenhas(u, quantidadeSUV);
+    }
+  }
+
+  public void alteraUsuario(String senha, int quantidadeSenhas) {
+    usuarioCorrente.setSenhaTextoPlano(senha);
+    usuarioCorrente.getCartaoSenhas().criaCartaoSenhas(usuarioCorrente.getLogin(),
+                                                       usuarioCorrente.getUid(), 
+                                                       quantidadeSenhas,
+                                                       usuarioCorrente.getLogin());
+    banco.alteraSenhaHex(usuarioCorrente.getUid(), usuarioCorrente.getSenhaHex());
+    banco.salvaSUV(usuarioCorrente);
+  }
+
+  public void deslogaUsuario() {
+
+    cTelaSenhaCartao.numTentativas = 0;
+    cTelaSenhaPessoal.numTentativas = 0;
+
+    usuarioCorrente = null;
+
+    mostraTelaSenhaCartao(false);
+    mostraTelaSenhaPessoal(false);
+    mostraTelaPrincipal(false);
+    mostraTelaLogin(true);
+  }
+}
